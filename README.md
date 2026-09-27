@@ -616,3 +616,15 @@ EventTicketingService/
    - **Encapsulated Business Logic**: Move transition rules, domain guards, missing field checks, and calculated properties (e.g. total amount calculation, formatted addresses, ticket counts) directly onto the `Order` class or value objects (`ContactInfo`, `PaymentInfo`, `SeatSelection`).
    - **Clean Serialization & Deserialization**: Standardize serialization between SQLite rows, domain models, and API responses, reducing boilerplate code in route handlers and eliminating field name inconsistencies.
 
+---
+
+## Where / How AI Was Used
+
+I used AI thoroughly for this project for code generation, massaging the output via a thorough code-review process—much like a senior developer tasking a junior developer with a task and then iteratively coaching toward a proper solution.
+
+The first few steps included the state machine transition map and a skeleton of test cases we could develop against. Then I began implementing the guards and API endpoints one at a time and iterating until they were readable, maintainable, and in line with the system design in my head.
+
+Once the endpoints were in place, again with AI's assistance (Gemini in this case), I began the effort of deduplicating, finding DB migrations and other dead code, and ensuring that the logic of the transition graph was executed in the services themselves.
+
+So where did I use AI? Everywhere. But the final say was always mine.
+
