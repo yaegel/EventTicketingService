@@ -577,6 +577,16 @@ EventTicketingService/
 
 ---
 
+## Architectural Tradeoffs
+
+- **SQLite vs. Containerized PostgreSQL**: SQLite (WAL mode) was selected for zero-dependency portability, fast local test execution, and self-contained review. In production, a containerized PostgreSQL instance is strongly preferred for true row-level locking (`SELECT ... FOR UPDATE SKIP LOCKED`), concurrent write scaling without database-level file locks, connection pooling (PgBouncer), and native JSONB queries.
+- **In-Process Daemon Threads vs. Decoupled Task Queue**: Embedding worker threads inside the Flask app avoided deploying separate infrastructure. A dedicated message queue (e.g., Celery, Redis Streams, or AWS SQS) running in isolated worker containers is preferred to eliminate CPU competition between web requests and background tasks, isolate worker crashes from the web server, and scale workers independently.
+- **Database Polling vs. Event-Driven Dispatch**: Workers periodically poll `v_orders_latest_status` on a 3-second interval. An event-driven bus (RabbitMQ, Kafka, or Redis pub/sub) would provide push-based, near-instantaneous fulfillment triggers without idle database read overhead.
+- **Periodic Hold Sweeps vs. Redis Key Expiration (TTL)**: Seat hold TTLs are tracked via timestamps and periodic worker sweeps. Using Redis with native key expiration (`EXPIRE`) and keyspace notifications would release abandoned seats instantaneously and provide sub-millisecond atomic seat-claiming checks.
+- **Direct Card Fields vs. Payment Tokenization**: Stored credit card details in table columns for demo simplicity and state-machine validation. Production systems should never handle or store raw credit card numbers; client-side tokenization (e.g., Stripe Elements or Adyen drop-in) is mandatory for payment security standards (PCI compliance).
+
+---
+
 ## What I'd change if I had time to iterate
 
 1. **More Robust Worker Thread Failure Handling**:
