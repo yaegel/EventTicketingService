@@ -574,3 +574,35 @@ EventTicketingService/
     ├── test_6_worker_processing.py        # Path 6: Worker fulfillment & decline handling
     └── test_7_ticket_delivery_failure_and_resolution.py # Path 7: Delivery failure & human resolution
 ```
+
+---
+
+## What I'd change if I had time to iterate
+
+1. **More Robust Worker Thread Failure Handling**:
+   - **Thread Supervision & Auto-Restart**: Implement a supervisor/watchdog process to monitor worker daemon health and automatically respawn dead worker threads if an unhandled exception or runtime fault crashes a thread.
+   - **Exponential Backoff with Jitter**: Replace fixed polling intervals with exponential backoff and jitter during transient database lock contention, network blips, or gateway outages.
+   - **Dead-Letter / Quarantine Queue**: Track processing attempt counts per order. If an order repeatedly fails during background processing beyond a threshold (e.g. 3 attempts), transition it to a dedicated dead-letter state rather than continually retrying or holding stale locks until timeout.
+   - **Distributed Task Queue Migration**: For horizontal scale across multiple server containers, graduate from local SQLite thread polling to a robust distributed message broker (such as Celery with Redis/RabbitMQ or AWS SQS).
+
+2. **Better Logging and a Log Retrieval Endpoint**:
+   - **Structured JSON Logging**: Switch from unstructured text logging to structured JSON logs with correlation IDs (`request_id`, `order_id`, `worker_id`, `thread_name`) for ingestion by log aggregators (e.g., Datadog, ELK stack, CloudWatch).
+   - **Admin Log Retrieval Endpoint (`GET /admin/logs`)**: Provide a secure, paginated, and filterable endpoint (by `order_id`, `severity`, or `time_range`) allowing operators and customer support staff to view audit and fulfillment logs directly from the API without requiring container shell or SSH access.
+   - **Enriched Audit Metadata**: Extend `order_status` with client IP, user-agent, and actor context (`system:worker`, `user:<id>`, `admin:<id>`) for forensic traceability.
+
+3. **Authentication and Request Validation for Security**:
+   - **API Authentication & Role-Based Access Control (RBAC)**: Secure endpoints with JWT or API Key authentication, separating public customer actions (`/claim_seats`, `/orders/<id>`) from privileged operator/admin actions (`/orders/<id>/resolve`, `/orders/<id>/close`, `/orders/<id>/refund`, and full order listing).
+   - **Declarative Schema Validation (Pydantic / Marshmallow)**: Enforce strict schema validation on all incoming request payloads, returning standardized 422 Unprocessable Entity responses with granular field-level validation errors.
+   - **Rate Limiting & Bot Protection**: Add token-bucket rate limiting (e.g., via Flask-Limiter with Redis) to `/claim_seats` to guard against seat scraping, inventory hoarding, and scalper bots.
+   - **Payment Tokenization & PCI Compliance**: Replace direct raw credit card input with client-side tokenized payment methods (e.g., Stripe Elements or Adyen drop-in tokens), ensuring sensitive cardholder numbers never touch the application server.
+
+4. **Increased / Maximum Processing Time Warnings and Error States for QoS Guarantees**:
+   - **QoS Metrics & SLA Monitoring**: Instrument the order pipeline to emit latency metrics (Prometheus / StatsD) measuring time elapsed in each state (`held` &rarr; `initialized`, `initialized` &rarr; `payment_authorized`, `payment_authorized` &rarr; `complete`).
+   - **Processing Time Warnings**: Log elevated warnings or emit alert webhooks when order fulfillment exceeds target Quality of Service (QoS) SLAs (e.g. payment authorization exceeding 2 seconds or ticket dispatch exceeding 5 seconds).
+   - **Explicit Timeout & QoS Error State**: If an order remains locked or processing beyond an acceptable upper bound, automatically transition it to a `processing_timed_out` or `needs_human_resolution` state to notify on-call engineering while unlocking resources.
+
+5. **Dedicated Domain Model (`Order` Class) for Validation, Serialization & Cleaner Code**:
+   - **Rich Domain Entity / Pydantic Model**: Refactor database dictionary representations and tuple unpacking into an authoritative `Order` domain model.
+   - **Encapsulated Business Logic**: Move transition rules, domain guards, missing field checks, and calculated properties (e.g. total amount calculation, formatted addresses, ticket counts) directly onto the `Order` class or value objects (`ContactInfo`, `PaymentInfo`, `SeatSelection`).
+   - **Clean Serialization & Deserialization**: Standardize serialization between SQLite rows, domain models, and API responses, reducing boilerplate code in route handlers and eliminating field name inconsistencies.
+
