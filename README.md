@@ -9,7 +9,7 @@ A lightweight Flask web service enforcing order state transitions with a local S
 - **Web Framework**: Flask (Python 3.11)
 - **Database**: SQLite with Write-Ahead Logging (`WAL` mode) for concurrent read/write support between request threads and the background worker.
 - **State Machine**: Enforces valid transitions and rejects invalid state changes.
-- **Background Worker**: A daemon thread continuously querying and processing the oldest unprocessed order in the database.
+- **Background Worker**: A configurable number of daemon threads continuously querying and processing the oldest unprocessed order in the database.
 - **Containerization**: Docker & Docker Compose.
 
 ---
